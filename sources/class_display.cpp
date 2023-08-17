@@ -20,12 +20,14 @@ Display::Display(int window_width, int window_height, std::string window_name) :
 
 Display::~Display()
 {
-    glfwDestroyWindow(_window);
+    if (_window != NULL)
+        glfwDestroyWindow(_window);
+    _window = NULL;
     glfwTerminate();
 }
 
 
-int Display::open()
+int Display::open(void)
 {
     if (glfwInit() != GLFW_TRUE)
     {
@@ -40,20 +42,38 @@ int Display::open()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     _window = glfwCreateWindow(_w_width, _w_height, _w_name.c_str(), NULL, NULL);
-    if (_window == NULL){
+    if (_window == NULL)
+    {
         std::cerr << "Failed to open GLFW window." << std::endl;
         return (-1);
     }
     glfwMakeContextCurrent(_window);
 
     glewExperimental=true;
-    if (glewInit() != GLEW_OK) {
+    if (glewInit() != GLEW_OK)
+    {
         std::cerr << "Failed to initialize GLEW" << std::endl;
         return (-1);
     }
 
     glfwSetInputMode(_window, GLFW_STICKY_KEYS, GL_TRUE);
+
     return (0);
+}
+
+
+void Display::clear(void)
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+
+void Display::close(void)
+{
+    if (_window != NULL)
+        glfwDestroyWindow(_window);
+    _window = NULL;
+    glfwTerminate();
 }
 
 
@@ -81,6 +101,12 @@ void Display::set_window_name(std::string name)
 }
 
 
+void Display::set_background_color(float r, float g, float b, float a)
+{
+    glClearColor(r, g, b, a);
+}
+
+
 bool Display::is_window_open(void)
 {
     return (glfwGetKey(_window, GLFW_KEY_ESCAPE ) != GLFW_PRESS
@@ -94,13 +120,7 @@ void Display::swap_buffers(void)
 }
 
 
-void Display::poll_events()
+void Display::poll_events(void)
 {
     glfwPollEvents();
-}
-
-void Display::close()
-{
-    glfwDestroyWindow(_window);
-    glfwTerminate();
 }
