@@ -15,6 +15,7 @@ Display::Display(int window_width, int window_height, std::string window_name) :
                 _w_name(window_name),
                 _window(nullptr)
 {
+    _w_ratio = static_cast<float>(_w_width) / static_cast<float>(_w_height);
 }
 
 
@@ -86,6 +87,11 @@ int Display::get_window_width(void)
 int Display::get_window_height(void)
 {
     return (_w_height);
+}
+
+float Display::get_window_ratio(void)
+{
+    return (_w_ratio);
 }
 
 

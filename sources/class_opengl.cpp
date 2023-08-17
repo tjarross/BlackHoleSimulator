@@ -1,5 +1,9 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
+#include "glm/glm.hpp"
+#include "glm/gtx/transform.hpp"
+
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -8,7 +12,7 @@
 #include "class_opengl.hpp"
 
 
-OpenGL::OpenGL()
+OpenGL::OpenGL() : _near_plane(0.1f), _far_plane(100.f)
 {
 }
 
@@ -18,8 +22,10 @@ OpenGL::~OpenGL()
 }
 
 
-void OpenGL::init(void)
+void OpenGL::init(float window_ratio)
 {
+	_window_ratio = window_ratio;
+
     glGenVertexArrays(1, &_vao);
     glBindVertexArray(_vao);
 }
@@ -114,6 +120,29 @@ int OpenGL::load_shaders(std::string vertex_shader_filepath, std::string fragmen
     glUseProgram(_program_id);
 
     return (0);
+}
+
+
+void OpenGL::create_mvp(void)
+{
+	glm::mat4 Projection = glm::perspective(glm::radians(45.0f), _window_ratio, _near_plane, _far_plane);
+
+	glm::mat4 View = glm::lookAt(
+				glm::vec3(1,0,3), // Camera is at (4,3,3), in World Space
+				glm::vec3(0,0,0), // and looks at the origin
+				glm::vec3(0,1,0)  // Head is up (set to 0,-1,0 to look upside-down)
+				);
+
+	glm::mat4 Model = glm::mat4(1.0f);
+	_mvp = Projection * View * Model;
+	
+	_matrix_id = glGetUniformLocation(_program_id, "MVP");
+}
+
+
+void OpenGL::load_mvp(void)
+{
+	glUniformMatrix4fv(_matrix_id, 1, GL_FALSE, &_mvp[0][0]);
 }
 
 

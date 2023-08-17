@@ -13,6 +13,7 @@ class Display
 
         int         get_window_width(void);
         int         get_window_height(void);
+        float       get_window_ratio(void);
         std::string get_window_name(void);
 
         void        set_window_name(std::string name);
@@ -29,6 +30,7 @@ class Display
 
         int         _w_width;
         int         _w_height;
+        float       _w_ratio;
         std::string _w_name;
 
         GLFWwindow  *_window;
