@@ -7,15 +7,14 @@
 #include "class_display.hpp"
 
 
-Display::Display(int window_width, int window_height, std::string window_name) :
-                _ogl_version_major(4),
-                _ogl_version_minor(6),
-                _w_width(window_width),
-                _w_height(window_height),
-                _w_name(window_name),
-                _window(nullptr)
+Display::Display(int window_width, int window_height, std::string window_name):
+    _ogl_version_major(4),
+    _ogl_version_minor(6),
+    _w_width(window_width),
+    _w_height(window_height),
+    _w_name(window_name),
+    _window(nullptr)
 {
-    _w_ratio = static_cast<float>(_w_width) / static_cast<float>(_w_height);
 }
 
 
@@ -58,6 +57,7 @@ int Display::open(void)
     }
 
     glfwSetInputMode(_window, GLFW_STICKY_KEYS, GL_TRUE);
+    glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
     return (0);
 }
@@ -78,6 +78,12 @@ void Display::close(void)
 }
 
 
+GLFWwindow *Display::get_window(void)
+{
+    return _window;
+}
+
+
 int Display::get_window_width(void)
 {
     return (_w_width);
@@ -87,11 +93,6 @@ int Display::get_window_width(void)
 int Display::get_window_height(void)
 {
     return (_w_height);
-}
-
-float Display::get_window_ratio(void)
-{
-    return (_w_ratio);
 }
 
 
@@ -124,7 +125,6 @@ void Display::swap_buffers(void)
 {
     glfwSwapBuffers(_window);
 }
-
 
 void Display::poll_events(void)
 {

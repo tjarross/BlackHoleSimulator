@@ -12,8 +12,21 @@
 #include "class_opengl.hpp"
 
 
-OpenGL::OpenGL() : _near_plane(0.1f), _far_plane(100.f)
+OpenGL::OpenGL(GLFWwindow *window):
+	_near_plane(0.1f),
+	_far_plane(100.f),
+	_position(glm::vec3(1, 0, 3)),
+	_direction(glm::vec3(0, 0, 0)),
+	_up(glm::vec3(0, 1, 0)),
+	_delta_time(0.f),
+	_speed(3.f),
+	_mouse_speed(0.05f),
+	_horizontal_angle(3.14f),
+	_vertical_angle(0.f),
+	_w_width(0),
+	_w_height(0)
 {
+	_window = window;
 }
 
 
@@ -22,12 +35,17 @@ OpenGL::~OpenGL()
 }
 
 
-void OpenGL::init(float window_ratio)
+void OpenGL::init(void)
 {
-	_window_ratio = window_ratio;
+	glfwGetWindowSize(_window, &_w_width, &_w_height);
+	_window_ratio = static_cast<float>(_w_width) / static_cast<float>(_w_height);
 
     glGenVertexArrays(1, &_vao);
     glBindVertexArray(_vao);
+
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
 }
 
 
@@ -125,16 +143,16 @@ int OpenGL::load_shaders(std::string vertex_shader_filepath, std::string fragmen
 
 void OpenGL::create_mvp(void)
 {
-	glm::mat4 Projection = glm::perspective(glm::radians(45.0f), _window_ratio, _near_plane, _far_plane);
+	_projection = glm::perspective(glm::radians(45.0f), _window_ratio, _near_plane, _far_plane);
 
-	glm::mat4 View = glm::lookAt(
+	_view = glm::lookAt(
 				glm::vec3(1,0,3), // Camera is at (4,3,3), in World Space
 				glm::vec3(0,0,0), // and looks at the origin
 				glm::vec3(0,1,0)  // Head is up (set to 0,-1,0 to look upside-down)
 				);
 
-	glm::mat4 Model = glm::mat4(1.0f);
-	_mvp = Projection * View * Model;
+	_model = glm::mat4(1.0f);
+	_mvp = _projection * _view * _model;
 	
 	_matrix_id = glGetUniformLocation(_program_id, "MVP");
 }
@@ -143,6 +161,13 @@ void OpenGL::create_mvp(void)
 void OpenGL::load_mvp(void)
 {
 	glUniformMatrix4fv(_matrix_id, 1, GL_FALSE, &_mvp[0][0]);
+}
+
+
+void OpenGL::update_mvp(void)
+{
+	_view = glm::lookAt(_position, _position + _direction, _up);
+	_mvp = _projection * _view * _model;
 }
 
 
@@ -188,4 +213,50 @@ void OpenGL::draw(void)
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(0);
+}
+
+void OpenGL::compute_delta_time(void)
+{
+	static float last_time = glfwGetTime();
+    double current_time = glfwGetTime();
+
+    _delta_time = static_cast<float>(current_time - last_time);
+    last_time = current_time;
+}
+
+void OpenGL::process_inputs(void)
+{
+    double xpos, ypos;
+    glfwGetCursorPos(_window, &xpos, &ypos);
+	glfwSetCursorPos(_window, _w_width / 2, _w_height / 2);
+	compute_delta_time();
+
+    _horizontal_angle += _mouse_speed * _delta_time * static_cast<float>(_w_width / 2.f - xpos);
+    _vertical_angle += _mouse_speed * _delta_time * static_cast<float>(_w_height / 2.f - ypos);
+
+
+    _direction = glm::vec3(
+        cos(_vertical_angle) * sin(_horizontal_angle),
+        sin(_vertical_angle),
+        cos(_vertical_angle) * cos(_horizontal_angle)
+    );
+    glm::vec3 right = glm::vec3(
+        sin(_horizontal_angle - 3.14f / 2.0f),
+        0,
+        cos(_horizontal_angle - 3.14f / 2.0f)
+    );
+    _up = glm::cross( right, _direction );
+
+    if (glfwGetKey(_window, GLFW_KEY_UP) == GLFW_PRESS){
+        _position += _direction * _delta_time * _speed;
+    }
+    if (glfwGetKey(_window, GLFW_KEY_DOWN) == GLFW_PRESS){
+        _position -= _direction * _delta_time * _speed;
+    }
+    if (glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_PRESS){
+        _position += right * _delta_time * _speed;
+    }
+    if (glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS){
+        _position -= right * _delta_time * _speed;
+    }
 }
