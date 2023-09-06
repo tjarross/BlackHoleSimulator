@@ -14,17 +14,18 @@
 
 OpenGL::OpenGL(GLFWwindow *window):
 	_near_plane(0.1f),
-	_far_plane(100.f),
-	_position(glm::vec3(1, 0, 3)),
+	_far_plane(100000.f),
+	_position(glm::vec3(-1.22, 0.83, 3.15)),
 	_direction(glm::vec3(0, 0, 0)),
 	_up(glm::vec3(0, 1, 0)),
-	_delta_time(0.f),
 	_speed(3.f),
 	_mouse_speed(0.05f),
-	_horizontal_angle(3.14f),
-	_vertical_angle(0.f),
+	_horizontal_angle(2.81),
+	_vertical_angle(-0.23),
 	_w_width(0),
-	_w_height(0)
+	_w_height(0),
+	_texture_width(0),
+	_texture_height(0)
 {
 	_window = window;
 }
@@ -32,6 +33,17 @@ OpenGL::OpenGL(GLFWwindow *window):
 
 OpenGL::~OpenGL()
 {
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glDeleteBuffers(1, &_screen_corners);
+    glDeleteBuffers(1, &_corners_ebo);
+
+    glDeleteTextures(1, &_texture);
+
+	glDeleteProgram(_program_id);
+
+	glBindVertexArray(0);
+	glDeleteVertexArrays(1, &_vao);
 }
 
 
@@ -66,7 +78,7 @@ int OpenGL::load_shaders(std::string vertex_shader_filepath, std::string fragmen
     else
     {
         std::cerr << "Cannot open" << vertex_shader_filepath << std::endl;
-		return 1;
+		return (1);
 	}
 
 	std::string fragment_shader_code;
@@ -80,7 +92,7 @@ int OpenGL::load_shaders(std::string vertex_shader_filepath, std::string fragmen
     else
     {
         std::cerr << "Cannot open" << fragment_shader_filepath << std::endl;
-		return 1;
+		return (1);
 	}
 
 	GLint result = GL_FALSE;
@@ -96,7 +108,7 @@ int OpenGL::load_shaders(std::string vertex_shader_filepath, std::string fragmen
     {
 		std::vector<char> error_message(log_length + 1);
 		glGetShaderInfoLog(vertex_shader_id, log_length, NULL, &error_message[0]);
-		printf("%s\n", &error_message[0]);
+		std::cerr << &error_message[0] << std::endl;
         return (1);
 	}
 
@@ -110,7 +122,7 @@ int OpenGL::load_shaders(std::string vertex_shader_filepath, std::string fragmen
     {
 		std::vector<char> error_message(log_length+1);
 		glGetShaderInfoLog(fragment_shader_id, log_length, NULL, &error_message[0]);
-		printf("%s\n", &error_message[0]);
+		std::cerr << &error_message[0] << std::endl;
         return (1);
 	}
 
@@ -125,7 +137,7 @@ int OpenGL::load_shaders(std::string vertex_shader_filepath, std::string fragmen
     {
 		std::vector<char> error_message(log_length + 1);
 		glGetProgramInfoLog(_program_id, log_length, NULL, &error_message[0]);
-		printf("%s\n", &error_message[0]);
+		std::cerr << &error_message[0] << std::endl;
         return (1);
 	}
 
@@ -171,38 +183,69 @@ void OpenGL::update_mvp(void)
 }
 
 
-void OpenGL::create_triangle(void)
+void OpenGL::create_texture(void)
 {
-    static const GLfloat coords[] = {
-        -1.0f, -1.0f, 0.0f,
-        1.0f, -1.0f, 0.0f,
-        0.0f,  1.0f, 0.0f,
-    };
-    static const GLfloat colors[] = {
-        0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 1.0f,
-        1.0f, 0.0f, 0.0f,
-    };
+	glm::vec3 screen_corners[] =
+	{
+		{1.f * _window_ratio, 1.f, 0.f},
+		{-1.f * _window_ratio, 1.f, 0.f},
+		{-1.f * _window_ratio, -1.f, 0.f},
+		{1.f * _window_ratio, -1.f, 0.f},
+	};
 
-    GLuint coordsbuffer;
-    glGenBuffers(1, &coordsbuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, coordsbuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(coords), coords, GL_STATIC_DRAW);
+	glm::vec2 texture_corners[] =
+	{
+		{1.f, 1.f},
+		{0.f, 1.f},
+		{0.f, 0.f},
+		{1.f, 0.f},
+	};
+	
+	unsigned int corner_indices[] =
+	{
+		0, 1, 2,
+		0, 2, 3,
+	};
+	
+	glGenBuffers(1, &_screen_corners);
+	glBindBuffer(GL_ARRAY_BUFFER, _screen_corners);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(screen_corners), screen_corners, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+	
+	glGenBuffers(1, &_texture_corners);
+	glBindBuffer(GL_ARRAY_BUFFER, _texture_corners);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texture_corners), texture_corners, GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+	
+	glGenBuffers(1, &_corners_ebo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _corners_ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(corner_indices), corner_indices, GL_STATIC_DRAW);
 
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, coordsbuffer);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-    glDisableVertexAttribArray(0);
+	_texture_width = _w_width;
+	_texture_height = _w_height;
+	glGenTextures(1, &_texture);
+	glBindTexture(GL_TEXTURE_2D, _texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _texture_width, _texture_height, 0, GL_BGRA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+}
 
-    GLuint colorsbuffer;
-    glGenBuffers(1, &colorsbuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsbuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
 
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, colorsbuffer);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-    glDisableVertexAttribArray(1);
+GLuint  OpenGL::get_texture(void)
+{
+	return (_texture);
+}
+
+
+int OpenGL::get_texture_width(void)
+{
+	return (_texture_width);
+}
+
+
+int OpenGL::get_texture_height(void)
+{
+	return (_texture_height);
 }
 
 
@@ -210,29 +253,35 @@ void OpenGL::draw(void)
 {
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(0);
 }
 
-void OpenGL::compute_delta_time(void)
+
+float OpenGL::compute_delta_time(void)
 {
 	static float last_time = glfwGetTime();
-    double current_time = glfwGetTime();
 
-    _delta_time = static_cast<float>(current_time - last_time);
-    last_time = current_time;
+    double current_time = glfwGetTime();
+    float delta_time = static_cast<float>(current_time - last_time);
+    
+	last_time = current_time;
+	return (delta_time);
 }
+
 
 void OpenGL::process_inputs(void)
 {
     double xpos, ypos;
+	float delta_time;
+
     glfwGetCursorPos(_window, &xpos, &ypos);
 	glfwSetCursorPos(_window, _w_width / 2, _w_height / 2);
-	compute_delta_time();
+	delta_time = compute_delta_time();
 
-    _horizontal_angle += _mouse_speed * _delta_time * static_cast<float>(_w_width / 2.f - xpos);
-    _vertical_angle += _mouse_speed * _delta_time * static_cast<float>(_w_height / 2.f - ypos);
+    _horizontal_angle += _mouse_speed * delta_time * static_cast<float>(_w_width / 2.f - xpos);
+    _vertical_angle += _mouse_speed * delta_time * static_cast<float>(_w_height / 2.f - ypos);
 
 
     _direction = glm::vec3(
@@ -247,16 +296,12 @@ void OpenGL::process_inputs(void)
     );
     _up = glm::cross( right, _direction );
 
-    if (glfwGetKey(_window, GLFW_KEY_UP) == GLFW_PRESS){
-        _position += _direction * _delta_time * _speed;
-    }
-    if (glfwGetKey(_window, GLFW_KEY_DOWN) == GLFW_PRESS){
-        _position -= _direction * _delta_time * _speed;
-    }
-    if (glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_PRESS){
-        _position += right * _delta_time * _speed;
-    }
-    if (glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS){
-        _position -= right * _delta_time * _speed;
-    }
+    if (glfwGetKey(_window, GLFW_KEY_UP) == GLFW_PRESS)
+        _position += _direction * delta_time * _speed;
+    if (glfwGetKey(_window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        _position -= _direction * delta_time * _speed;
+    if (glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        _position += right * delta_time * _speed;
+    if (glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        _position -= right * delta_time * _speed;
 }

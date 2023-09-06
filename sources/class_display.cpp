@@ -1,4 +1,3 @@
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
@@ -125,6 +124,7 @@ void Display::swap_buffers(void)
 {
     glfwSwapBuffers(_window);
 }
+
 
 void Display::poll_events(void)
 {
